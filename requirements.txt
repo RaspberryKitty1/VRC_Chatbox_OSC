@@ -1,3 +1,5 @@
 spotipy
 python-osc
 python-dotenv
+psutil
+pynvml
