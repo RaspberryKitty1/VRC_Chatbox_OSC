@@ -37,7 +37,7 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
 
    - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
    - Create a new app
-   - Set Redirect URI to `http://localhost:8888/callback`
+   - Set Redirect URI to `http://127.0.0.1:8888/callback`
    - Note your `Client ID` and `Client Secret`
 
 1. **Create a `.env` file**
@@ -47,7 +47,7 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
    ```dotenv
    SPOTIPY_CLIENT_ID=your-client-id
    SPOTIPY_CLIENT_SECRET=your-client-secret
-   SPOTIPY_REDIRECT_URI=http://localhost:8888/callback
+   SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
    ```
 
 1. **Run the script**
