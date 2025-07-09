@@ -23,6 +23,12 @@ def format_time(ms):
     minutes = seconds // 60
     return f"{minutes}:{str(seconds % 60).zfill(2)}"
 
+def create_progress_bar(progress_ms, duration_ms, bar_length=10):
+    """Return a bar like ▮▮▯▯▯▯▯▯▯▯"""
+    percent = progress_ms / duration_ms
+    filled = round(percent * bar_length)
+    return '▮' * filled + '▯' * (bar_length - filled)
+
 def get_spotify_info():
     """Fetch current playing track info from Spotify"""
     current = sp.current_playback()
@@ -30,9 +36,15 @@ def get_spotify_info():
     if current and current['is_playing']:
         song = current['item']['name']
         artist = ", ".join([a['name'] for a in current['item']['artists']])
-        progress = format_time(current['progress_ms'])
-        duration = format_time(current['item']['duration_ms'])
-        return f"🎵 {song} by {artist}\n{progress} | {duration}"
+        progress_ms = current['progress_ms']
+        duration_ms = current['item']['duration_ms']
+
+        progress_bar = create_progress_bar(progress_ms, duration_ms)
+        progress = format_time(progress_ms)
+        duration = format_time(duration_ms)
+
+        message = f"🎵 {song} by {artist}\n{progress_bar} ({progress} / {duration})"
+        return message
     else:
         return "⏸️ Nothing is playing on Spotify."
 
@@ -41,7 +53,7 @@ def send_to_vrchat(msg):
     client.send_message(OSC_ADDRESS, [msg, True])
     print("Sent:", msg)
 
-# === Loop: Check every 10 seconds ===
+# === Main Loop ===
 try:
     last_message = ""
     while True:
@@ -49,6 +61,6 @@ try:
         if msg != last_message:
             send_to_vrchat(msg)
             last_message = msg
-        time.sleep(10)  # Check every 10 seconds
+        time.sleep(1)  # Update every second
 except KeyboardInterrupt:
     print("Stopped.")
