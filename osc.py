@@ -1,21 +1,54 @@
+import time
+import spotipy
+from spotipy.oauth2 import SpotifyOAuth
 from pythonosc.udp_client import SimpleUDPClient
 
-# Set the IP and port for VRChat's OSC input (default is localhost and port 9000)
-ip = "127.0.0.1"
-port = 9000
+# === VRChat OSC Setup ===
+VRCHAT_IP = "127.0.0.1"
+VRCHAT_PORT = 9000
+OSC_ADDRESS = "/chatbox/input"
+client = SimpleUDPClient(VRCHAT_IP, VRCHAT_PORT)
 
-# OSC address for sending a message to the local chatbox
-osc_address = "/chatbox/input"
+# === Spotify API Setup ===
+sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
+    client_id="YOUR_CLIENT_ID",
+    client_secret="YOUR_CLIENT_SECRET",
+    redirect_uri="http://localhost:8888/callback",
+    scope="user-read-playback-state"
+))
 
-# The message to send
-message = "Hello from Python!"
+def format_time(ms):
+    """Convert milliseconds to M:SS format"""
+    seconds = int(ms / 1000)
+    minutes = seconds // 60
+    return f"{minutes}:{str(seconds % 60).zfill(2)}"
 
-# Whether the message should be visible in the VRChat HUD (True = shows in-game chatbox)
-show_in_chatbox = True
+def get_spotify_info():
+    """Fetch current playing track info from Spotify"""
+    current = sp.current_playback()
 
-# Create an OSC client
-client = SimpleUDPClient(ip, port)
+    if current and current['is_playing']:
+        song = current['item']['name']
+        artist = ", ".join([a['name'] for a in current['item']['artists']])
+        progress = format_time(current['progress_ms'])
+        duration = format_time(current['item']['duration_ms'])
+        return f"🎵 {song} by {artist}\n{progress} | {duration}"
+    else:
+        return "⏸️ Nothing is playing on Spotify."
 
-# Send the message
-client.send_message(osc_address, [message, show_in_chatbox])
-print(f"Message sent to VRChat: {message}")
+def send_to_vrchat(msg):
+    """Send a message to VRChat chatbox"""
+    client.send_message(OSC_ADDRESS, [msg, True])
+    print("Sent:", msg)
+
+# === Loop: Check every 10 seconds ===
+try:
+    last_message = ""
+    while True:
+        msg = get_spotify_info()
+        if msg != last_message:
+            send_to_vrchat(msg)
+            last_message = msg
+        time.sleep(10)  # Check every 10 seconds
+except KeyboardInterrupt:
+    print("Stopped.")
