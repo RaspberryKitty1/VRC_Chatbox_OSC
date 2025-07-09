@@ -9,8 +9,10 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
 - Displays current time (12-hour format)
 - Shows CPU, GPU (NVIDIA), and RAM usage
 - Shows Spotify currently playing song with progress time
+- **Toggle output modes:** full (default), system-only, or Spotify-only
 - Updates safely every 2 seconds to avoid VRChat message loss
 - Uses environment variables to securely manage Spotify API credentials
+- Gracefully handles missing GPU or Spotify data
 
 ---
 
@@ -27,20 +29,26 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
 
 1. **Clone or download this repo**
 
-1. **Install dependencies**
+2. **Install dependencies**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-1. **Create a Spotify Developer App**
+3. **Create a Spotify Developer App**
 
    - Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
-   - Create a new app
-   - Set Redirect URI to `http://127.0.0.1:8888/callback`
-   - Note your `Client ID` and `Client Secret`
 
-1. **Create a `.env` file**
+   - Create a new app
+
+   - Set the Redirect URI to:
+     `http://127.0.0.1:8888/callback`
+
+     > ⚠️ Spotify is deprecating `localhost`. Use `127.0.0.1` instead.
+
+   - Note your **Client ID** and **Client Secret**
+
+4. **Create a `.env` file**
 
    In the project folder, create a `.env` file:
 
@@ -50,7 +58,7 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
    SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
    ```
 
-1. **Run the script**
+5. **Run the script**
 
    ```bash
    python vrchat_system_spotify_status.py
@@ -60,17 +68,32 @@ Send your Spotify now-playing info along with your system stats (CPU, GPU, RAM, 
 
 ## Usage
 
-- Make sure VRChat is running with OSC enabled
-- Play music on Spotify
-- The script will automatically send updates to your VRChat chatbox every 2 seconds
+By default, the script sends **both** system stats and Spotify song info to the VRChat chatbox.
+
+### 🛠 Mode Selection (Optional)
+
+Use the `--mode` flag to control what gets shown:
+
+| Mode      | Description                |
+| --------- | -------------------------- |
+| `full`    | (Default) System + Spotify |
+| `system`  | System stats only          |
+| `spotify` | Spotify info only          |
+
+### Example
+
+```bash
+python vrchat_system_spotify_status.py --mode spotify
+```
 
 ---
 
 > [!NOTE]
 >
 > - GPU usage requires an NVIDIA GPU and `pynvml` installed
-> - The script handles missing GPU info gracefully
+> - If GPU is not detected, GPU usage will show as `N/A`
 > - If nothing is playing on Spotify, a pause message is sent
+> - Avoid spamming the chatbox: the script only sends updates when content changes
 
 ---
 
@@ -83,4 +106,5 @@ See the [LICENSE](LICENSE) file for full details.
 
 ## Contributions
 
-Feel free to open issues or submit pull requests for improvements or bug fixes!
+Pull requests and issue reports are welcome!
+If you have ideas, improvements, or fixes — feel free to contribute!

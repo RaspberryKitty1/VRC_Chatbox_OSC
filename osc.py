@@ -1,6 +1,7 @@
 import os
 import time
 from datetime import datetime
+import argparse
 from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
@@ -35,6 +36,16 @@ sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
     scope="user-read-playback-state"
 ))
 
+# === Command-line argument parsing ===
+parser = argparse.ArgumentParser(description="VRChat System + Spotify Status")
+parser.add_argument(
+    "--mode",
+    choices=["full", "system", "spotify"],
+    default="full",
+    help="Select what to display: full (default), system, or spotify"
+)
+args = parser.parse_args()
+
 def format_time(ms):
     seconds = int(ms / 1000)
     minutes = seconds // 60
@@ -51,8 +62,8 @@ def get_spotify_message():
             progress = format_time(current["progress_ms"])
             duration = format_time(track["duration_ms"])
             return f"🎵 {song} by {artist}\n{progress} / {duration}"
-    except:
-        pass
+    except Exception as e:
+        print(f"[Spotify Error] {e}")
     return ""
 
 def get_system_stats():
@@ -66,7 +77,8 @@ def get_system_stats():
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
             gpu = f"{util.gpu}%"
-        except:
+        except Exception as e:
+            print(f"[GPU Error] {e}")
             gpu = "Err"
     return f"{now}\nCPU:{cpu:.0f}% | GPU:{gpu} | RAM:{ram:.0f}%"
 
@@ -76,18 +88,24 @@ def send_to_vrchat(msg):
 
 # === Main Loop ===
 if __name__ == "__main__":
-    print("🚀 VRChat System + Spotify status started")
+    print(f"🚀 VRChat System + Spotify status started (Mode: {args.mode})")
     last_message = ""
     try:
         while True:
             system_info = get_system_stats()
             song_info = get_spotify_message()
-            full_message = system_info + "\n\n" + (song_info or "⏸️ Nothing playing")
-            
+
+            if args.mode == "full":
+                full_message = system_info + "\n\n" + (song_info or "⏸️ Nothing playing")
+            elif args.mode == "system":
+                full_message = system_info
+            elif args.mode == "spotify":
+                full_message = song_info or "⏸️ Nothing playing"
+
             if full_message != last_message:
                 send_to_vrchat(full_message)
                 last_message = full_message
-            
+
             time.sleep(2)
     except KeyboardInterrupt:
         print("🛑 Stopped by user.")
