@@ -1,5 +1,16 @@
+# === Spotify API ===
 spotipy
+
+# === OSC Communication ===
 python-osc
+
+# === Environment Variable Management ===
 python-dotenv
+
+# === System Monitoring ===
 psutil
-pynvml
+pynvml  # Optional: only needed for GPU stats (NVIDIA)
+
+# === Tray Icon and Image Support ===
+pystray
+pillow
