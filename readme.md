@@ -71,6 +71,7 @@ Create a file named `.env` in the project folder:
 SPOTIPY_CLIENT_ID=your-client-id
 SPOTIPY_CLIENT_SECRET=your-client-secret
 SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
+VRCHAT_IP=127.0.0.1
 ```
 
 ---
