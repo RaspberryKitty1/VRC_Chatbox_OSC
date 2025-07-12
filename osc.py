@@ -26,7 +26,7 @@ client_secret = os.getenv("SPOTIPY_CLIENT_SECRET")
 redirect_uri = os.getenv("SPOTIPY_REDIRECT_URI")
 
 # === VRChat OSC Setup ===
-VRCHAT_IP = "127.0.0.1"
+VRCHAT_IP = os.getenv("VRCHAT_IP")
 VRCHAT_PORT = 9000
 OSC_ADDRESS = "/chatbox/input"
 client = SimpleUDPClient(VRCHAT_IP, VRCHAT_PORT)
