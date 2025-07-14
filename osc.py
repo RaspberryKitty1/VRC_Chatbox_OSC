@@ -1,15 +1,18 @@
 import os
-import time
 import threading
+import time
 from datetime import datetime
-from dotenv import load_dotenv
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
-from pythonosc.udp_client import SimpleUDPClient
+
 import psutil
-from PIL import Image, ImageDraw
 import pystray
+import requests
+import spotipy
+from dotenv import load_dotenv
+from PIL import Image, ImageDraw
 from pystray import MenuItem as item
+from pythonosc.udp_client import SimpleUDPClient
+from spotipy.exceptions import SpotifyException
+from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
 
 # === Optional GPU stats ===
 try:
@@ -85,21 +88,29 @@ def get_spotify_client():
     token_info = auth_manager.get_cached_token()
 
     if not token_info:
-        print(
-            "[Spotify Auth] No cached token found. Opening browser for authentication...")
+        print("[Spotify Auth] No cached token found. Attempting to get access token...")
         try:
             token_info = auth_manager.get_access_token()
-        except Exception as e:
+        except SpotifyOauthError as e:
             print(f"[Spotify Auth Error] Failed to get access token: {e}")
+            try:
+                auth_url = auth_manager.get_authorize_url()
+                print("If the browser didn't open, visit this URL manually:\n" + auth_url)
+            except SpotifyOauthError:
+                print("Could not generate auth URL.")
+            return None
+
+        if not token_info:
+            print("[Spotify Auth] Token still missing after auth attempt.")
             return None
 
     if auth_manager.is_token_expired(token_info):
         try:
-            token_info = auth_manager.refresh_access_token(
-                token_info['refresh_token'])
-        except Exception as e:
+            token_info = auth_manager.refresh_access_token(token_info['refresh_token'])
+        except SpotifyOauthError as e:  
             print(f"[Spotify Refresh Error] {e}")
             return None
+
     return spotipy.Spotify(auth=token_info['access_token'])
 
 def format_time(ms):
@@ -142,9 +153,8 @@ def fetch_spotify_playback(max_retries=3, delay=2):
                 spotify_cache["is_playing"] = False
                 spotify_cache["last_fetch_time"] = now
                 return False
-        except Exception as e:
-            print(
-                f"[Attempt {attempt}/{max_retries}] Spotify Fetch Error: {e}")
+        except (SpotifyException, requests.exceptions.RequestException, KeyError, AttributeError) as e:
+            print(f"[Attempt {attempt}/{max_retries}] Spotify Fetch Error: {e}")
             if attempt < max_retries:
                 time.sleep(delay * attempt)
             else:
@@ -181,14 +191,16 @@ def get_system_stats():
     cpu = psutil.cpu_percent()
     ram = psutil.virtual_memory().percent
     gpu = "N/A"
+
     if gpu_available:
         try:
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
             gpu = f"{util.gpu}%"
-        except Exception as e:
+        except pynvml.NVMLError as e:
             print(f"[GPU Error] {e}")
             gpu = "Err"
+
     return f"{now}\nCPU:{cpu:.0f}% | GPU:{gpu} | RAM:{ram:.0f}%"
 
 # === OSC Send ===
