@@ -36,7 +36,8 @@ auth_manager = SpotifyOAuth(
     client_id=client_id,
     client_secret=client_secret,
     redirect_uri=redirect_uri,
-    scope="user-read-playback-state"
+    scope="user-read-playback-state",
+    cache_path=".spotify_token_cache"
 )
 
 # === Tray icon image ===
@@ -74,7 +75,16 @@ def create_chat_bubble_icon(size=64):
 # === Spotify Functions ===
 def get_spotify_client():
     token_info = auth_manager.get_cached_token()
-    if not token_info or auth_manager.is_token_expired(token_info):
+
+    if not token_info:
+        print("[Spotify Auth] No cached token found. Opening browser for authentication...")
+        try:
+            token_info = auth_manager.get_access_token()
+        except Exception as e:
+            print(f"[Spotify Auth Error] Failed to get access token: {e}")
+            return None
+
+    if auth_manager.is_token_expired(token_info):
         try:
             token_info = auth_manager.refresh_access_token(token_info['refresh_token'])
         except Exception as e:
