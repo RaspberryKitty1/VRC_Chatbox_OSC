@@ -14,3 +14,6 @@ pynvml  # Optional: only needed for GPU stats (NVIDIA)
 # === Tray Icon and Image Support ===
 pystray
 pillow
+
+
+websockets==11.0.3

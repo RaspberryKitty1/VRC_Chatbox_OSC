@@ -1,82 +1,92 @@
-# 🗨️ VRChat Spotify + System Stats Chatbox Integration
+# 🗨️ VRChat Spotify, YouTube & System Stats Chatbox Integration
 
-Display your **Spotify now-playing info** and **system stats** (CPU, GPU, RAM, local time) directly in your **VRChat chatbox** using **OSC (Open Sound Control)**. Includes a **tray icon** for live mode switching with no console window!
+Display your **Spotify now-playing**, **YouTube playback info**, and **real-time system stats** (CPU, GPU, RAM, local time) in your **VRChat chatbox** using **OSC (Open Sound Control)**. Features a **tray icon** for live mode switching and no console window clutter.
 
 ---
 
 ## 🚀 Features
 
-* Displays local time in 12-hour format
-* Real-time CPU, GPU (NVIDIA), and RAM usage
-* Current Spotify song info with timestamp progress
-* **Tray icon with chat bubble + live mode switching**
-* Three display modes: full (default), system-only, or Spotify-only
-* Smart update system (only sends when content changes)
-* Uses `.env` for secure Spotify API credentials
-* Graceful fallback if no Spotify or GPU data available
-* Can be hidden from view (no console window)
+* 🎵 Spotify playback info with timestamp progress
+* 📺 YouTube video info via browser extension
+* 🖥️ System stats: CPU, GPU (NVIDIA), RAM, and local time
+* 🟢 Smart OSC updates: only sends when data changes
+* 💬 Tray icon with live display mode switching
+* 💡 Four modes:
+
+  * `full` — All info (default)
+  * `system` — System stats only
+  * `spotify` — Spotify only
+  * `youtube` — YouTube video only
+* 🔐 Uses `.env` for secure Spotify credentials
+* 🪶 Runs silently in system tray (no console window)
+* 🔁 Fallbacks gracefully if Spotify or GPU data unavailable
 
 ---
 
 ## 🧰 Requirements
 
+* Windows
 * Python 3.7+
-* Spotify account + Developer App
 * VRChat with OSC enabled
-  (Enable in: **Settings > OSC > Enable OSC**)
-* Windows with optional:
+  *(Settings > OSC > Enable OSC)*
+* Optional:
 
-  * NVIDIA GPU for GPU stats (fallbacks to N/A if unavailable)
+  * **Spotify account** + Developer App
+  * **Firefox** + [YouTube Media Info Extractor](https://github.com/RaspberryKitty1/VRC-OSC-Youtube-Companion)
+  * **NVIDIA GPU** for GPU usage stats
 
 ---
 
 ## 📦 Setup
 
-### 1. Clone or download this repository
+### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/raspberryKitty1/vrchat-status-overlay.git
+git clone https://github.com/RaspberryKitty1/VRC_Chatbox_OSC.git
 cd vrchat-status-overlay
 ```
 
----
-
-### 2. Install dependencies
+### 2. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
----
+### 3. Configure Spotify
 
-### 3. Create a Spotify Developer App
+1. Create a Spotify Developer App:
+   [https://developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
 
-* Visit: [https://developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)
-* Create an app
-* Set Redirect URI to:
+2. Set the redirect URI to:
 
-```plaintext
-http://127.0.0.1:8888/callback
-```
+   ```plaintext
+   http://127.0.0.1:8888/callback
+   ```
 
-> ⚠️ Use `127.0.0.1`, not `localhost`, to avoid redirect issues.
+3. Create a `.env` file in the project folder:
 
----
-
-### 4. Add your credentials to `.env`
-
-Create a file named `.env` in the project folder:
-
-```dotenv
-SPOTIPY_CLIENT_ID=your-client-id
-SPOTIPY_CLIENT_SECRET=your-client-secret
-SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
-VRCHAT_IP=127.0.0.1
-```
+   ```dotenv
+   SPOTIPY_CLIENT_ID=your-client-id
+   SPOTIPY_CLIENT_SECRET=your-client-secret
+   SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
+   VRCHAT_IP=127.0.0.1
+   ```
 
 ---
 
-### 5. Run the app (console version)
+## 🎥 YouTube Integration
+
+To display **YouTube video info** in VRChat:
+
+1. Install the [YouTube Media Info Extractor](https://github.com/RaspberryKitty1/VRC_Chatbox_OSC) Firefox extension
+2. Start a YouTube video in Firefox
+3. Right-click the tray icon and switch to `youtube` mode
+
+> 📡 The extension sends data to `ws://localhost:12345`, which this app receives and forwards to VRChat.
+
+---
+
+## 🖥️ Run the App (Console)
 
 ```bash
 python vrchat_status_tray.py
@@ -84,65 +94,60 @@ python vrchat_status_tray.py
 
 ---
 
-## 🖥️ No Console Mode (Tray App)
+## 🔕 Run Silently (No Console Window)
 
-If you want the script to **run silently in the tray**:
+### Option A: `.pyw` + `pythonw`
 
-### ➤ Option A: Rename to `.pyw` and run with `pythonw`
-
-1. Rename `vrchat_status_tray.py` → `vrchat_status_tray.pyw`
-2. Launch using:
+1. Rename:
+   `vrchat_status_tray.py` → `vrchat_status_tray.pyw`
+2. Launch with:
 
 ```bat
 start "" venv\Scripts\pythonw.exe vrchat_status_tray.pyw
 ```
 
----
-
-### ➤ Option B: Build as `.exe` with PyInstaller
+### Option B: Compile `.exe` with PyInstaller
 
 ```bash
 pyinstaller --noconsole --onefile --icon=chat_bubble.ico vrchat_status_tray.py
 ```
 
-Your `.exe` will appear in the `dist/` folder and launch with a tray icon and no visible window.
+Output will be in `dist/`.
 
 ---
 
-## 📋 Usage: Tray & Modes
+## 💬 Tray Icon & Display Modes
 
-When launched, the app places a **chat bubble icon** in your system tray. Right-click to choose:
+Right-click the tray icon to switch modes:
 
-| Mode      | Description                |
-| --------- | -------------------------- |
-| `full`    | System + Spotify (default) |
-| `system`  | System stats only          |
-| `spotify` | Spotify info only          |
-| `Quit`    | Cleanly exits the app      |
+| Mode      | Description                              |
+| --------- | ---------------------------------------- |
+| `full`    | System stats + Spotify/YouTube (default) |
+| `system`  | CPU, GPU, RAM, local time only           |
+| `spotify` | Spotify song info only                   |
+| `youtube` | YouTube video title + timestamp only     |
+| `Quit`    | Cleanly exits the app                    |
 
-🟢 The tray updates the VRChat chatbox every 2 seconds if the content has changed.
-
----
-
-> [!NOTE]
->
-> * 🎵 **Spotify** must be running and playing to show track info
-> * 📉 **GPU stats** require an NVIDIA GPU + `pynvml`
-> * ⏸️ If nothing is playing, it shows “Nothing playing”
-> * 🧠 Spotify info is cached to reduce API calls (15s max delay)
-> * 🧼 Output avoids spam by only sending updates when content changes
-> * 🔒 Your Spotify tokens are cached and refreshed automatically
+📡 Updates are sent every 2 seconds **only if content changes**, reducing OSC spam.
 
 ---
 
-## 🧾 License
+## 📝 Notes
 
-MIT License — see [LICENSE](LICENSE)
+* 🎵 Spotify must be running and playing to show song info
+* 📺 YouTube support requires Firefox + browser extension
+* 📉 GPU stats require an NVIDIA GPU and `pynvml`
+* 🔒 Spotify tokens are cached and refreshed automatically
+* 🧼 Output avoids clutter by only updating when needed
 
 ---
 
-## 🤝 Contributions
+## 📜 License
 
-Pull requests and issues welcome!
-Feel free to contribute improvements, bug fixes, or feature suggestions.
+Licensed under the [MIT License](LICENSE)
 
+---
+
+## 🤝 Contribute
+
+Issues, PRs, and ideas are always welcome!
