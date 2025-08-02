@@ -112,9 +112,22 @@ def get_spotify_client():
     return spotipy.Spotify(auth=token_info['access_token'])
 
 def format_time(seconds):
-    minutes = int(seconds) // 60
-    secs = int(seconds) % 60
-    return f"{minutes}:{str(secs).zfill(2)}"
+    seconds = int(seconds)
+    days = seconds // 86400
+    seconds %= 86400
+    hours = seconds // 3600
+    seconds %= 3600
+    minutes = seconds // 60
+    secs = seconds % 60
+    
+    if days > 0:
+        return f"{days}:{str(hours).zfill(2)}:{str(minutes).zfill(2)}:{str(secs).zfill(2)}"
+    elif hours > 0:
+        return f"{hours}:{str(minutes).zfill(2)}:{str(secs).zfill(2)}"
+    else:
+        return f"{minutes}:{str(secs).zfill(2)}"
+
+
 
 spotify_cache = {
     "song": None,
