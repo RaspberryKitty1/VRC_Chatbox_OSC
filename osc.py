@@ -85,6 +85,10 @@ def create_chat_bubble_icon(size=64, mode="full"):
         )
     return image
 
+# === Helper: shorten long titles ===
+def shorten_title(title, max_length=60):
+    return title if len(title) <= max_length else title[:max_length - 1] + "…"
+
 # === Spotify Functions ===
 def get_spotify_client():
     token_info = auth_manager.get_cached_token()
@@ -126,7 +130,6 @@ def format_time(seconds):
         return f"{hours}:{str(minutes).zfill(2)}:{str(secs).zfill(2)}"
     else:
         return f"{minutes}:{str(secs).zfill(2)}"
-
 
 
 spotify_cache = {
@@ -185,7 +188,12 @@ def get_spotify_message_with_progress_update(fetch_interval=15):
 
         progress_str = format_time(current_progress)
         duration_str = format_time(spotify_cache["duration_ms"])
-        return f"🎵 {spotify_cache['song']}\n👤 {spotify_cache['artist']}\n⌛ {progress_str} / {duration_str}"
+
+        # Shorten song title and artist for neatness
+        song_short = shorten_title(spotify_cache['song'], 60)
+        artist_short = shorten_title(spotify_cache['artist'], 60)
+
+        return f"🎵 {song_short}\n👤 {artist_short}\n⌛ {progress_str} / {duration_str}"
     else:
         if spotify_cache["last_stopped_time"] and (now - spotify_cache["last_stopped_time"] < 10):
             return "⏸️ Nothing playing"
@@ -286,7 +294,7 @@ def get_extension_message():
     now = time.time()
     with extension_data_lock:
         if extension_data["title"] and (now - extension_data["last_update"] < 10):
-            title = extension_data["title"]
+            title = shorten_title(extension_data["title"], 60)
             uploader = extension_data.get("uploader", "")
             curr = format_time(extension_data["currentTime"])
             dur = format_time(extension_data["duration"])
