@@ -185,7 +185,7 @@ def get_spotify_message_with_progress_update(fetch_interval=15):
 
         progress_str = format_time(current_progress)
         duration_str = format_time(spotify_cache["duration_ms"])
-        return f"🎵 {spotify_cache['song']} by {spotify_cache['artist']}\n{progress_str} / {duration_str}"
+        return f"🎵 {spotify_cache['song']}\n👤 {spotify_cache['artist']}\n⌛ {progress_str} / {duration_str}"
     else:
         if spotify_cache["last_stopped_time"] and (now - spotify_cache["last_stopped_time"] < 10):
             return "⏸️ Nothing playing"
@@ -218,6 +218,7 @@ def send_to_vrchat(msg):
 # === Extension WebSocket Shared State ===
 extension_data = {
     "title": None,
+    "uploader": "",
     "duration": 0,
     "currentTime": 0,
     "last_update": 0
@@ -238,6 +239,7 @@ async def ws_handler(websocket, path):
             with extension_data_lock:
                 extension_data.update({
                     "title": data.get("title"),
+                    "uploader": data.get("uploader", ""),
                     "duration": data.get("duration", 0),
                     "currentTime": data.get("currentTime", 0),
                     "last_update": time.time()
@@ -285,9 +287,16 @@ def get_extension_message():
     with extension_data_lock:
         if extension_data["title"] and (now - extension_data["last_update"] < 10):
             title = extension_data["title"]
+            uploader = extension_data.get("uploader", "")
             curr = format_time(extension_data["currentTime"])
             dur = format_time(extension_data["duration"])
-            return f"📺 {title}\n{curr} / {dur}"
+
+            parts = [f"📺 {title}"]
+            if uploader:
+                parts.append(f"👤 {uploader}")
+            parts.append(f"⌛ {curr} / {dur}")
+
+            return "\n".join(parts)
     return ""
 
 # === State and Thread Control ===
