@@ -125,7 +125,7 @@ Right-click the tray icon to switch modes:
 | `full`    | System stats + Spotify/YouTube (default) |
 | `system`  | CPU, GPU, RAM, local time only           |
 | `spotify` | Spotify song info only                   |
-| `youtube` | YouTube video title + timestamp only     |
+| `youtube` | YouTube video title + timestamp + Uploader    |
 | `Quit`    | Cleanly exits the app                    |
 
 📡 Updates are sent every 2 seconds **only if content changes**, reducing OSC spam.
@@ -151,3 +151,4 @@ Licensed under the [MIT License](LICENSE)
 ## 🤝 Contribute
 
 Issues, PRs, and ideas are always welcome!
+
