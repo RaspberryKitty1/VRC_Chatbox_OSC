@@ -112,15 +112,9 @@ def get_spotify_client():
     return spotipy.Spotify(auth=token_info['access_token'])
 
 def format_time(seconds):
-    seconds = int(seconds)
-    hours = seconds // 3600
-    minutes = (seconds % 3600) // 60
-    secs = seconds % 60
-    if hours > 0:
-        return f"{hours}:{str(minutes).zfill(2)}:{str(secs).zfill(2)}"
-    else:
-        return f"{minutes}:{str(secs).zfill(2)}"
-
+    minutes = int(seconds) // 60
+    secs = int(seconds) % 60
+    return f"{minutes}:{str(secs).zfill(2)}"
 
 spotify_cache = {
     "song": None,
@@ -233,7 +227,6 @@ async def ws_handler(websocket, path):
                     "title": data.get("title"),
                     "duration": data.get("duration", 0),
                     "currentTime": data.get("currentTime", 0),
-		    "isLive": data.get("isLive", False),
                     "last_update": time.time()
                 })
     except Exception as e:
@@ -280,14 +273,8 @@ def get_extension_message():
         if extension_data["title"] and (now - extension_data["last_update"] < 10):
             title = extension_data["title"]
             curr = format_time(extension_data["currentTime"])
-            dur = extension_data["duration"]
-            is_live = extension_data.get("isLive", False)
-
-            if is_live or dur <= 0:
-                return f"📺 {title}\n🔴 Live — {curr} elapsed"
-            else:
-                dur_str = format_time(dur)
-                return f"📺 {title}\n{curr} / {dur_str}"
+            dur = format_time(extension_data["duration"])
+            return f"📺 {title}\n{curr} / {dur}"
     return ""
 
 # === State and Thread Control ===
