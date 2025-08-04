@@ -1,3 +1,4 @@
+# === Imports and Setup ===
 import asyncio
 import json
 import os
@@ -7,7 +8,6 @@ from datetime import datetime
 
 import psutil
 import pystray
-import requests
 import spotipy
 import websockets
 from dotenv import load_dotenv
@@ -16,13 +16,16 @@ from pystray import MenuItem as item
 from pythonosc.udp_client import SimpleUDPClient
 from spotipy.exceptions import SpotifyException
 from spotipy.oauth2 import SpotifyOAuth, SpotifyOauthError
+from requests.exceptions import RequestException
+from websockets.exceptions import ConnectionClosedError
+from json import JSONDecodeError
 
 # === Optional GPU stats ===
 try:
     import pynvml
     pynvml.nvmlInit()
     gpu_available = True
-except:
+except (ModuleNotFoundError, pynvml.NVMLError):
     gpu_available = False
 
 # === Load .env variables ===
@@ -50,27 +53,20 @@ def create_chat_bubble_icon(size=64, mode="full"):
     image = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
-    if mode == "full":
-        bubble_color = (30, 144, 255, 255)  # Blue
-    elif mode == "system":
-        bubble_color = (169, 169, 169, 255)  # Gray
-    elif mode == "spotify":
-        bubble_color = (30, 215, 96, 255)  # Spotify green
-    elif mode == "media":
-        bubble_color = (255, 69, 0, 255)  # Orange Red for media (YouTube/Twitch)
-    else:
-        bubble_color = (100, 100, 100, 255)
-
+    color_map = {
+        "full": (30, 144, 255, 255),
+        "system": (169, 169, 169, 255),
+        "spotify": (30, 215, 96, 255),
+        "media": (255, 69, 0, 255)
+    }
+    bubble_color = color_map.get(mode, (100, 100, 100, 255))
     dot_color = (255, 255, 255, 255)
+
     radius = size // 6
     rect = [size * 0.125, size * 0.125, size * 0.875, size * 0.75]
     draw.rounded_rectangle(rect, radius=radius, fill=bubble_color)
 
-    tail = [
-        (size * 0.33, size * 0.75),
-        (size * 0.5, size * 0.9),
-        (size * 0.56, size * 0.75)
-    ]
+    tail = [(size * 0.33, size * 0.75), (size * 0.5, size * 0.9), (size * 0.56, size * 0.75)]
     draw.polygon(tail, fill=bubble_color)
 
     dot_radius = size / 14
@@ -78,11 +74,8 @@ def create_chat_bubble_icon(size=64, mode="full"):
     center_y = size * 0.45
     centers_x = [size / 2 - spacing, size / 2, size / 2 + spacing]
     for cx in centers_x:
-        draw.ellipse(
-            [(cx - dot_radius, center_y - dot_radius),
-             (cx + dot_radius, center_y + dot_radius)],
-            fill=dot_color
-        )
+        draw.ellipse([(cx - dot_radius, center_y - dot_radius), (cx + dot_radius, center_y + dot_radius)], fill=dot_color)
+
     return image
 
 # === Helper: shorten long titles ===
@@ -91,40 +84,37 @@ def shorten_title(title, max_length=60):
 
 # === Spotify Functions ===
 def get_spotify_client():
-    token_info = auth_manager.get_cached_token()
-    if not token_info:
-        try:
-            token_info = auth_manager.get_access_token()
-        except SpotifyOauthError:
-            try:
-                auth_url = auth_manager.get_authorize_url()
-                print("Open the URL manually to authenticate:\n" + auth_url)
-            except:
-                print("Spotify Auth URL generation failed.")
-            return None
+    try:
+        token_info = auth_manager.get_cached_token()
         if not token_info:
-            return None
-    if auth_manager.is_token_expired(token_info):
-        try:
+            token_info = auth_manager.get_access_token()
+        if auth_manager.is_token_expired(token_info):
             token_info = auth_manager.refresh_access_token(token_info['refresh_token'])
-        except SpotifyOauthError:
-            return None
-    return spotipy.Spotify(auth=token_info['access_token'])
+        return spotipy.Spotify(auth=token_info['access_token'])
+    except SpotifyOauthError as e:
+        try:
+            auth_url = auth_manager.get_authorize_url()
+            print("Open the URL manually to authenticate:\n" + auth_url)
+        except SpotifyOauthError as auth_url_error:
+            print(f"[Spotify Auth URL Error] {auth_url_error}")
+        return None
+    except Exception as e:
+        print(f"[Spotify Client Error] {e}")
+        return None
+
 
 def format_time(seconds):
     seconds = int(seconds)
-    days = seconds // 86400
-    seconds %= 86400
-    hours = seconds // 3600
-    seconds %= 3600
-    minutes = seconds // 60
-    secs = seconds % 60
-    if days > 0:
+    days, seconds = divmod(seconds, 86400)
+    hours, seconds = divmod(seconds, 3600)
+    minutes, secs = divmod(seconds, 60)
+    if days:
         return f"{days}:{hours:02}:{minutes:02}:{secs:02}"
-    elif hours > 0:
+    elif hours:
         return f"{hours}:{minutes:02}:{secs:02}"
     else:
         return f"{minutes}:{secs:02}"
+
 
 spotify_cache = {
     "song": None,
@@ -133,8 +123,9 @@ spotify_cache = {
     "last_progress_ms": 0,
     "last_fetch_time": 0,
     "is_playing": False,
-    "last_stopped_time": 0  
+    "last_stopped_time": 0
 }
+
 
 def fetch_spotify_playback(max_retries=3, delay=2):
     for attempt in range(1, max_retries + 1):
@@ -143,15 +134,17 @@ def fetch_spotify_playback(max_retries=3, delay=2):
             if not client:
                 return False
             current = client.current_playback()
-            if current and current.get("is_playing", False) and current["item"]:
+            if current and current.get("is_playing") and current["item"]:
                 track = current["item"]
-                spotify_cache["song"] = track["name"]
-                spotify_cache["artist"] = ", ".join(a["name"] for a in track["artists"])
-                spotify_cache["duration_ms"] = track["duration_ms"] // 1000
-                spotify_cache["last_progress_ms"] = current["progress_ms"] // 1000
-                spotify_cache["last_fetch_time"] = time.time()
-                spotify_cache["is_playing"] = True
-                spotify_cache["last_stopped_time"] = 0
+                spotify_cache.update({
+                    "song": track["name"],
+                    "artist": ", ".join(a["name"] for a in track["artists"]),
+                    "duration_ms": track["duration_ms"] // 1000,
+                    "last_progress_ms": current["progress_ms"] // 1000,
+                    "last_fetch_time": time.time(),
+                    "is_playing": True,
+                    "last_stopped_time": 0
+                })
                 return True
             else:
                 now = time.time()
@@ -160,37 +153,31 @@ def fetch_spotify_playback(max_retries=3, delay=2):
                 spotify_cache["is_playing"] = False
                 spotify_cache["last_fetch_time"] = now
                 return False
+        except SpotifyException as e:
+            print(f"[Spotify API Error] {e}")
+        except RequestException as e:
+            print(f"[Spotify Network Error] {e}")
         except Exception as e:
-            print(f"[Spotify Error] {e}")
-            if attempt < max_retries:
-                time.sleep(delay * attempt)
-            else:
-                return False
+            print(f"[Spotify Unexpected Error] {e}")
+        if attempt < max_retries:
+            time.sleep(delay * attempt)
+    return False
+
 
 def get_spotify_message_with_progress_update(fetch_interval=15):
     now = time.time()
-    time_since_fetch = now - spotify_cache["last_fetch_time"]
-    if time_since_fetch > fetch_interval:
+    if now - spotify_cache["last_fetch_time"] > fetch_interval:
         fetch_spotify_playback()
 
     if spotify_cache["is_playing"]:
         elapsed = now - spotify_cache["last_fetch_time"]
-        current_progress = spotify_cache["last_progress_ms"] + int(elapsed)
-        if current_progress > spotify_cache["duration_ms"]:
-            current_progress = spotify_cache["duration_ms"]
+        current_progress = min(spotify_cache["last_progress_ms"] + int(elapsed), spotify_cache["duration_ms"])
 
-        progress_str = format_time(current_progress)
-        duration_str = format_time(spotify_cache["duration_ms"])
-
-        song_short = shorten_title(spotify_cache['song'], 60)
-        artist_short = shorten_title(spotify_cache['artist'], 60)
-
-        return f"🎵 {song_short}\n👤 {artist_short}\n⌛ {progress_str} / {duration_str}"
+        return f"🎵 {shorten_title(spotify_cache['song'])}\n👤 {shorten_title(spotify_cache['artist'])}\n⌛ {format_time(current_progress)} / {format_time(spotify_cache['duration_ms'])}"
+    elif spotify_cache["last_stopped_time"] and (now - spotify_cache["last_stopped_time"] < 10):
+        return "⏸️ Nothing playing"
     else:
-        if spotify_cache["last_stopped_time"] and (now - spotify_cache["last_stopped_time"] < 10):
-            return "⏸️ Nothing playing"
-        else:
-            return ""
+        return ""
 
 # === System Info ===
 def get_system_stats():
@@ -204,15 +191,19 @@ def get_system_stats():
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             util = pynvml.nvmlDeviceGetUtilizationRates(handle)
             gpu = f"{util.gpu}%"
-        except Exception:
+        except pynvml.NVMLError as e:
             gpu = "Err"
+            print(f"[GPU Stat Error] {e}")
 
     return f"{now}\nCPU:{cpu:.0f}% | GPU:{gpu} | RAM:{ram:.0f}%"
 
 # === OSC Send ===
 def send_to_vrchat(msg):
-    client.send_message(OSC_ADDRESS, [msg, True])
-    print("Sent:\n" + msg + "\n" + "-"*30)
+    try:
+        client.send_message(OSC_ADDRESS, [msg, True])
+        print("Sent:\n" + msg + "\n" + "-" * 30)
+    except Exception as e:
+        print(f"[OSC Send Error] {e}")
 
 # === Extension WebSocket Shared State ===
 extension_data = {
@@ -235,20 +226,26 @@ async def ws_handler(websocket, path):
     print("[WebSocket] Client connected.")
     try:
         async for message in websocket:
-            data = json.loads(message)
-            with extension_data_lock:
-                extension_data.update({
-                    "title": data.get("title"),
-                    "uploader": data.get("streamer") or data.get("uploader") or "",
-                    "duration": data.get("duration", 0),
-                    "currentTime": data.get("currentTime", 0),
-                    "last_update": time.time(),
-                    "live": data.get("live", False)
-                })
+            try:
+                data = json.loads(message)
+                with extension_data_lock:
+                    extension_data.update({
+                        "title": data.get("title"),
+                        "uploader": data.get("streamer") or data.get("uploader") or "",
+                        "duration": data.get("duration", 0),
+                        "currentTime": data.get("currentTime", 0),
+                        "last_update": time.time(),
+                        "live": data.get("live", False)
+                    })
+            except JSONDecodeError as e:
+                print(f"[WebSocket JSON Error] {e}")
+    except ConnectionClosedError as e:
+        print(f"[WebSocket Closed] {e}")
     except Exception as e:
-        print(f"[WebSocket] Error: {e}")
+        print(f"[WebSocket Error] {e}")
     finally:
         print("[WebSocket] Client disconnected.")
+
 
 def start_ws_server():
     global ws_server_running
@@ -257,15 +254,19 @@ def start_ws_server():
 
     async def run_server():
         global ws_server_running
-        async with websockets.serve(ws_handler, "localhost", 12345):
-            ws_server_running = True
-            print("[WebSocket] Server started on ws://localhost:12345")
-            while not ws_server_stop_event.is_set():
-                await asyncio.sleep(1)
-            print("[WebSocket] Server stopping...")
+        try:
+            async with websockets.serve(ws_handler, "localhost", 12345):
+                ws_server_running = True
+                print("[WebSocket] Server started on ws://localhost:12345")
+                while not ws_server_stop_event.is_set():
+                    await asyncio.sleep(1)
+                print("[WebSocket] Server stopping...")
+        except OSError as e:
+            print(f"[WebSocket Server Error] {e}")
 
     loop.run_until_complete(run_server())
     ws_server_running = False
+
 
 def maybe_start_ws_server():
     global ws_server_thread
@@ -273,6 +274,7 @@ def maybe_start_ws_server():
         ws_server_stop_event.clear()
         ws_server_thread = threading.Thread(target=start_ws_server, daemon=True)
         ws_server_thread.start()
+
 
 def maybe_stop_ws_server():
     global ws_server_thread
@@ -287,24 +289,11 @@ def get_extension_message():
     now = time.time()
     with extension_data_lock:
         if extension_data["title"] and (now - extension_data["last_update"] < 10):
-            title = shorten_title(extension_data["title"], 60)
-            uploader = extension_data.get("uploader", "")
-            live = extension_data.get("live", False)
-
-            parts = [f"📺 {title}"]
-            if uploader:
-                parts.append(f"👤 {uploader}")
-
-            curr = format_time(extension_data["currentTime"])
-            if live:
-                dur_str = "LIVE"
-                live_str = " (LIVE)"
-            else:
-                dur_str = format_time(extension_data["duration"])
-                live_str = ""
-
-            parts.append(f"⌛ {curr} / {dur_str}{live_str}")
-
+            parts = [f"📺 {shorten_title(extension_data['title'])}"]
+            if extension_data["uploader"]:
+                parts.append(f"👤 {extension_data['uploader']}")
+            duration = "LIVE" if extension_data["live"] else format_time(extension_data["duration"])
+            parts.append(f"⌛ {format_time(extension_data['currentTime'])} / {duration}")
             return "\n".join(parts)
     return ""
 
@@ -313,6 +302,7 @@ current_mode = "full"
 current_mode_lock = threading.Lock()
 stop_event = threading.Event()
 last_message = ""
+
 
 # === Main update loop ===
 def update_loop():
@@ -359,15 +349,20 @@ def on_mode_change(icon, item):
             maybe_stop_ws_server()
 
     icon.icon = create_chat_bubble_icon(64, current_mode)
-    icon.menu = pystray.Menu(*create_menu())
-    icon.update_menu()
-    icon.visible = False
-    icon.visible = True
+    try:
+        icon.menu = pystray.Menu(*create_menu())
+        icon.update_menu()
+        icon.visible = False
+        icon.visible = True
+    except Exception as e:
+        print(f"[Tray Icon Refresh Error] {e}")
+
 
 def on_quit(icon, item):
     stop_event.set()
     maybe_stop_ws_server()
     icon.stop()
+
 
 def create_menu():
     with current_mode_lock:
@@ -391,7 +386,8 @@ if __name__ == "__main__":
     thread = threading.Thread(target=update_loop, daemon=True)
     thread.start()
 
-    icon = pystray.Icon("VRChatStatus", icon_image, "VRChat System + Spotify + Media", pystray.Menu(*create_menu()))
+    icon = pystray.Icon("VRChatStatus", icon_image,
+                        "VRChat System + Spotify + Media", pystray.Menu(*create_menu()))
     icon.run()
 
     stop_event.set()
