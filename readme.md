@@ -78,7 +78,7 @@ http://127.0.0.1:8888/callback
 
 To show YouTube or Twitch video info:
 
-1. Install the [Media Info Extractor Extension](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion) in Firefox
+1. Install the [Media Info Extractor Extension/User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion) in Firefox
 2. Play a video on YouTube or Twitch
 3. Right-click the tray icon and select `media` mode
 
@@ -147,3 +147,4 @@ Licensed under the [MIT License](LICENSE)
 ## 🤝 Contribute
 
 Feedback, bug reports, and contributions are welcome via [Issues](https://github.com/RaspberryKitty1/VRC_Chatbox_OSC/issues) or PRs!
+
