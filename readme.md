@@ -33,7 +33,7 @@ Display your **Spotify now-playing**, **YouTube/Twitch playback info**, and **re
 * Optional:
 
   * Spotify account + Developer App
-  * Firefox + [Media Info Extractor Extension](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion)
+  * Firefox/Chrome + [Media Info Extractor Extension/User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion)
   * NVIDIA GPU for GPU stats (`pynvml`)
 
 ---
@@ -147,4 +147,5 @@ Licensed under the [MIT License](LICENSE)
 ## 🤝 Contribute
 
 Feedback, bug reports, and contributions are welcome via [Issues](https://github.com/RaspberryKitty1/VRC_Chatbox_OSC/issues) or PRs!
+
 
