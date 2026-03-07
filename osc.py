@@ -20,18 +20,16 @@ from pythonosc.udp_client import SimpleUDPClient
 import websockets
 from websockets.exceptions import ConnectionClosedError
 
-
-# === Optional GPU stats (run only at startup) ===
+# === Optional GPU stats ===
 GPU_AVAILABLE = False
 try:
     import pynvml
     pynvml.nvmlInit()
     GPU_AVAILABLE = True
 except ModuleNotFoundError:
-    print("[GPU] pynvml not installed, GPU stats disabled.")
+    print("[GPU] nvidia-ml-py not installed, GPU stats disabled.")
 except pynvml.NVMLError as e:
     print(f"[GPU] NVML initialization failed: {e}, GPU stats disabled.")
-
 
 # === Load Environment Variables ===
 load_dotenv()
@@ -43,9 +41,6 @@ VRCHAT_PORT = 9000
 OSC_ADDRESS = "/chatbox/input"
 
 # === Utility Functions ===
-def shorten_title(title, max_length=50):
-    return title if len(title) <= max_length else title[:max_length - 1] + "…"
-
 def format_time(seconds):
     seconds = int(seconds)
     days, seconds = divmod(seconds, 86400)
@@ -57,6 +52,11 @@ def format_time(seconds):
         return f"{hours}:{minutes:02}:{secs:02}"
     else:
         return f"{minutes}:{secs:02}"
+
+def truncate_field(text, max_chars):
+    if not text:
+        return ""
+    return text if len(text) <= max_chars else text[:max_chars-1] + "…"
 
 # === Spotify Module ===
 auth_manager = SpotifyOAuth(
@@ -85,7 +85,6 @@ def get_spotify_client():
                 token_info = auth_manager.get_access_token()
             elif auth_manager.is_token_expired(token_info):
                 token_info = auth_manager.refresh_access_token(token_info['refresh_token'])
-
             if spotify_client is None:
                 spotify_client = spotipy.Spotify(auth=token_info['access_token'])
             else:
@@ -136,19 +135,24 @@ async def fetch_spotify_playback_async(max_retries=3, delay=2):
         await asyncio.sleep(delay * (attempt + 1))
     return False
 
-async def get_spotify_message_async(fetch_interval=15):
+async def get_spotify_message_vrchat():
     with spotify_paused_lock:
-        if spotify_paused: return ""
+        if spotify_paused:
+            return ""
+
     now = time.time()
-    if now - spotify_cache["last_fetch"] > fetch_interval:
+    if now - spotify_cache["last_fetch"] > 4:
         await fetch_spotify_playback_async()
+
     if spotify_cache["is_playing"]:
         elapsed = int(now - spotify_cache["last_fetch"])
         current_progress = min(spotify_cache["progress"] + elapsed, spotify_cache["duration"])
-        return f"🎵 {shorten_title(spotify_cache['song'])}\n👤 {shorten_title(spotify_cache['artist'])}\n⌛ {format_time(current_progress)} / {format_time(spotify_cache['duration'])}"
+        # Return full text, no truncation
+        return f"🎵 {spotify_cache['song']}\n👤 {spotify_cache['artist']}\n⌛ {format_time(current_progress)} / {format_time(spotify_cache['duration'])}"
     elif spotify_cache["last_stopped"] and (now - spotify_cache["last_stopped"] < 10):
         return "⏸️ Nothing playing"
     return ""
+
 
 # === VRChat OSC Module ===
 osc_client = SimpleUDPClient(VRCHAT_IP, VRCHAT_PORT)
@@ -164,7 +168,6 @@ def send_to_vrchat(msg):
     except Exception as e:
         print(f"[OSC Send Error] {e}")
 
-# === System Stats Module ===
 def get_system_stats():
     now = datetime.now().strftime("🕒 %I:%M %p")
     cpu = round(psutil.cpu_percent())
@@ -182,14 +185,13 @@ def get_system_stats():
 
     return f"{now}\nCPU:{cpu}% | GPU:{gpu}% | RAM:{ram}%"
 
-
 # === WebSocket Extension Module ===
 extension_data = {"title": None, "uploader": "", "duration":0, "currentTime":0, "last_update":0, "live":False}
 extension_data_lock = threading.Lock()
 ws_server_thread = None
 ws_server_running = False
 ws_server_stop_event = threading.Event()
-ws_client_count = 0  # optional: track active clients
+ws_client_count = 0
 
 async def ws_handler(websocket, path):
     global ws_client_count
@@ -216,7 +218,6 @@ async def ws_handler(websocket, path):
         ws_client_count -= 1
         print(f"[WebSocket] Client disconnected. Total clients: {ws_client_count}")
 
-
 def start_ws_server():
     global ws_server_running
     loop = asyncio.new_event_loop()
@@ -235,42 +236,83 @@ def start_ws_server():
 
     loop.run_until_complete(run_server())
 
-
 def maybe_start_ws_server():
     global ws_server_thread
     if ws_server_running:
-        print("[WebSocket] Server already running.")
         return
-    print("[WebSocket] Starting server thread...")
     ws_server_stop_event.clear()
     ws_server_thread = threading.Thread(target=start_ws_server, daemon=True)
     ws_server_thread.start()
 
-
 def maybe_stop_ws_server():
     global ws_server_thread
     if not ws_server_running:
-        print("[WebSocket] Server not running.")
         return
-    print("[WebSocket] Stopping server...")
     ws_server_stop_event.set()
     if ws_server_thread:
         ws_server_thread.join(timeout=5)
         ws_server_thread = None
-    print("[WebSocket] Server stop signal sent.")
 
-
-def get_extension_message():
+def get_extension_message_vrchat(max_title=40, max_uploader=30):
+    """Return media message with truncated title/uploader and full duration."""
     now = time.time()
     with extension_data_lock:
         if extension_data["title"] and now - extension_data["last_update"] < 10:
-            parts = [f"📺 {shorten_title(extension_data['title'])}"]
-            if extension_data["uploader"]:
-                parts.append(f"👤 {extension_data['uploader']}")
+            title = truncate_field(extension_data["title"], max_title)
+            uploader = truncate_field(extension_data["uploader"], max_uploader)
             duration = "LIVE" if extension_data["live"] else format_time(extension_data["duration"])
-            parts.append(f"⌛ {format_time(extension_data['currentTime'])} / {duration}")
-            return "\n".join(parts)
+            
+            return f"📺 {title}\n👤 {uploader}\n⌛ {format_time(extension_data['currentTime'])} / {duration}"
     return ""
+
+# === VRChat Message Builder (144 chars) ===
+def build_dynamic_vrchat_message(system_info, spotify_info, media_info, max_length=144):
+    """
+    Build VRChat-safe message:
+    - Max 144 chars (including newlines)
+    - Preserve system info fully
+    - Preserve blank line after system info
+    - Preserve duration line fully
+    - Truncate only middle content if needed
+    """
+    system_lines = system_info.split("\n") if system_info else []
+    content = media_info or spotify_info or ""
+    content_lines = content.split("\n") if content else []
+
+    if content_lines:
+        # Add blank line after system info
+        content_lines = [""] + content_lines
+
+    # Separate duration line
+    duration_line = content_lines[-1] if content_lines else ""
+    middle_lines = content_lines[:-1]
+
+    # Join middle lines with newline
+    middle_text = "\n".join(middle_lines)
+
+    # Compute total length with newlines
+    reserved_len = sum(len(line) for line in system_lines) + len(system_lines)  # system lines + newlines
+    reserved_len += len(duration_line) + 1  # duration line + newline
+    reserved_len += len(middle_lines)  # middle newlines
+
+    available_len = max_length - reserved_len
+    if available_len < 0:
+        available_len = 0
+
+    # Truncate middle content if needed
+    if len(middle_text) > available_len:
+        middle_text = middle_text[:max(0, available_len-1)] + "…"
+
+    # Rebuild final string
+    final_message = "\n".join(system_lines)
+    if middle_text:
+        final_message += "\n" + middle_text
+    if duration_line:
+        final_message += "\n" + duration_line
+
+    return final_message
+
+
 
 
 # === Tray Icon & Menu ===
@@ -278,25 +320,28 @@ current_mode = "full"
 current_mode_lock = threading.Lock()
 last_message = ""
 
+spotify_paused = False
+paused = False
+paused_lock = threading.Lock()
+
 def create_chat_bubble_icon(size=64, mode="full", spotify_paused=False, sending_paused=False):
     image = Image.new("RGBA", (size, size), (0,0,0,0))
     draw = ImageDraw.Draw(image)
     color_map = {
-    "full": (30, 144, 255, 255),       # Dodger Blue
-    "system": (138, 43, 226, 255),     # BlueViolet (distinct purple)
-    "spotify": (30, 215, 96, 255),     # Spotify green
-    "media": (255, 69, 0, 255),        # OrangeRed
-    "paused": (169, 169, 169, 255),    # DarkGray for paused
-    "spotify_paused": (255, 215, 0, 255) # Gold
-}
-
-
+        "full": (30, 144, 255, 255),
+        "system": (138, 43, 226, 255),
+        "spotify": (30, 215, 96, 255),
+        "media": (255, 69, 0, 255),
+        "paused": (169, 169, 169, 255),
+        "spotify_paused": (255, 215, 0, 255)
+    }
     if sending_paused:
         bubble_color = color_map["paused"]
     elif spotify_paused:
         bubble_color = color_map["spotify_paused"]
     else:
         bubble_color = color_map.get(mode, (100,100,100,255))
+    
     dot_color = (255,255,255,255)
     radius = size//6
     rect = [size*0.125, size*0.125, size*0.875, size*0.75]
@@ -311,115 +356,43 @@ def create_chat_bubble_icon(size=64, mode="full", spotify_paused=False, sending_
         draw.ellipse([(cx-dot_radius, center_y-dot_radius),(cx+dot_radius, center_y+dot_radius)], fill=dot_color)
     return image
 
-# === Main Update Loop ===
-async def update_loop_async():
-    global last_message
-    while not stop_event.is_set():
-        with current_mode_lock:
-            mode = current_mode
-
-        system_info = get_system_stats()
-        ext_info = get_extension_message()
-        song_info = await get_spotify_message_async()
-
-        if mode == "full":
-            parts = [system_info]
-            if ext_info: parts.append(ext_info)
-            elif song_info: parts.append(song_info)
-            full_message = "\n\n".join(parts)
-        elif mode == "system":
-            full_message = system_info
-        elif mode == "spotify":
-            full_message = song_info or "⏸️ Nothing playing"
-        elif mode == "media":
-            full_message = ext_info or "⏸️ No video detected"
-        else:
-            full_message = "Unknown mode"
-
-        if full_message != last_message:
-            send_to_vrchat(full_message)
-            last_message = full_message
-
-        await asyncio.sleep(2)
-        
-# === Tray menu actions ===
 def on_mode_change(icon, item):
     global current_mode
     with current_mode_lock:
         current_mode = item.text
-        print(f"[Tray] Mode changed to: {current_mode}")
         if current_mode in ("full", "media"):
             maybe_start_ws_server()
         else:
             maybe_stop_ws_server()
-
-    icon.icon = create_chat_bubble_icon(
-        64,
-        "paused" if paused else current_mode,
-        spotify_paused=spotify_paused,
-        sending_paused=paused
-    )
+    icon.icon = create_chat_bubble_icon(64, "paused" if paused else current_mode, spotify_paused=spotify_paused, sending_paused=paused)
     refresh_tray_menu(icon)
-
 
 def on_toggle_pause(icon, item):
     global paused
     with paused_lock:
         paused = not paused
-    state = "Paused" if paused else "Resumed"
-    print(f"🟡 Message sending {state}.")
-    icon.icon = create_chat_bubble_icon(
-        64,
-        "paused" if paused else current_mode,
-        spotify_paused=spotify_paused,
-        sending_paused=paused
-    )
+    icon.icon = create_chat_bubble_icon(64, "paused" if paused else current_mode, spotify_paused=spotify_paused, sending_paused=paused)
     refresh_tray_menu(icon)
-
 
 def on_toggle_spotify_pause(icon, item):
     global spotify_paused
     with spotify_paused_lock:
         spotify_paused = not spotify_paused
-    state = "Paused" if spotify_paused else "Resumed"
-    print(f"🟢 Spotify fetching {state}.")
-    icon.icon = create_chat_bubble_icon(
-        64,
-        "paused" if paused else current_mode,
-        spotify_paused=spotify_paused,
-        sending_paused=paused
-    )
+    icon.icon = create_chat_bubble_icon(64, "paused" if paused else current_mode, spotify_paused=spotify_paused, sending_paused=paused)
     refresh_tray_menu(icon)
-
 
 def on_quit(icon, item):
     stop_event.set()
     maybe_stop_ws_server()
     icon.stop()
-    print("🛑 Exited cleanly.")
-
-
-def refresh_tray_menu(icon):
-    """Rebuild the menu dynamically to reflect current states."""
-    try:
-        icon.menu = pystray.Menu(*create_menu())
-        icon.update_menu()
-        # Force refresh
-        icon.visible = False
-        icon.visible = True
-    except Exception as e:
-        print(f"[Tray Icon Refresh Error] {e}")
-
 
 def create_menu():
-    """Return a tuple of MenuItems with checkmarks and dynamic text."""
     with current_mode_lock:
         mode = current_mode
     with paused_lock:
         is_paused = paused
     with spotify_paused_lock:
         is_spotify_paused = spotify_paused
-
     return (
         item("full", on_mode_change, checked=lambda i: i.text == mode, radio=True),
         item("system", on_mode_change, checked=lambda i: i.text == mode, radio=True),
@@ -431,22 +404,54 @@ def create_menu():
         item("Quit", on_quit)
     )
 
+def refresh_tray_menu(icon):
+    try:
+        icon.menu = pystray.Menu(*create_menu())
+        icon.update_menu()
+        icon.visible = False
+        icon.visible = True
+    except Exception as e:
+        print(f"[Tray Icon Refresh Error] {e}")
+
+# === Main Update Loop ===
+async def update_loop_async():
+    global last_message
+    while not stop_event.is_set():
+        with current_mode_lock:
+            mode = current_mode
+
+        system_info = get_system_stats()
+        spotify_info = await get_spotify_message_vrchat()
+        media_info = get_extension_message_vrchat()
+
+        if mode == "full":
+            full_message = build_dynamic_vrchat_message(system_info, spotify_info, media_info, max_length=144)
+        elif mode == "system":
+            full_message = system_info[:144]
+        elif mode == "spotify":
+            full_message = spotify_info[:144] or "⏸️ Nothing playing"
+        elif mode == "media":
+            full_message = media_info[:144] or "⏸️ No video detected"
+        else:
+            full_message = "Unknown mode"
+
+        if full_message != last_message:
+            send_to_vrchat(full_message)
+            last_message = full_message
+
+        await asyncio.sleep(2)
 
 # === Main Entrypoint ===
 if __name__ == "__main__":
     print("🚀 VRChat Tray Status App Started")
     stop_event = threading.Event()
 
-    # Initial tray icon
     icon_image = create_chat_bubble_icon(64, current_mode, spotify_paused=spotify_paused, sending_paused=paused)
-
     if current_mode in ("full", "media"):
         maybe_start_ws_server()
 
-    # Start async update loop
     threading.Thread(target=lambda: asyncio.run(update_loop_async()), daemon=True).start()
 
-    # Start tray icon
     icon = pystray.Icon(
         "VRChatStatus",
         icon_image,
@@ -456,4 +461,4 @@ if __name__ == "__main__":
     icon.run()
 
     stop_event.set()
-    maybe_stop_ws_server()
+   

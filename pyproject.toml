@@ -1,0 +1,16 @@
+[project]
+name = "vrc-osc"
+version = "1.0.0"
+description = "Vrchat OSC Message Sender"
+readme = "README.md"
+requires-python = ">=3.14.3"
+dependencies = [
+    "nvidia-ml-py>=13.590.48",
+    "pillow>=12.1.1",
+    "psutil>=7.2.2",
+    "pystray>=0.19.5",
+    "python-dotenv>=1.2.2",
+    "python-osc>=1.9.3",
+    "spotipy>=2.26.0",
+    "websockets==11.0.3",
+]

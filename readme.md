@@ -4,6 +4,11 @@ Display your **Spotify now-playing**, **YouTube/Twitch playback info**, and **re
 
 ---
 
+![UV](https://img.shields.io/badge/dependencies-uv-brightgreen)
+![Python](https://img.shields.io/badge/python-3.14+-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Windows](https://img.shields.io/badge/platform-Windows-blue)
+
 ## 🚀 Features
 
 * 🎵 Real-time Spotify playback info with progress updates
@@ -36,7 +41,7 @@ Display your **Spotify now-playing**, **YouTube/Twitch playback info**, and **re
 ## 🧰 Requirements
 
 * Windows
-* Python 3.7+
+* UV
 * VRChat with OSC enabled
   *(Settings → OSC → Enable OSC & note your local IP)*
 
@@ -44,7 +49,25 @@ Optional:
 
 * Spotify account + Developer App
 * Firefox/Chrome + [Media Info Extractor Extension/User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion)
-* NVIDIA GPU for GPU stats (`pynvml`)
+* NVIDIA GPU for GPU stats (`nvidia-ml-py`)
+
+---
+
+# 🛠️ Setup
+
+This project uses **uv** for dependency management instead of `pip`.
+
+**Python 3.14+ is required.**
+
+UV handles:
+
+* virtual environments
+* dependency installation
+* Python version management
+* running the project
+
+Documentation:
+[https://docs.astral.sh/uv/](https://docs.astral.sh/uv/)
 
 ---
 
@@ -57,10 +80,10 @@ git clone https://github.com/RaspberryKitty1/VRC_Chatbox_OSC.git
 cd VRC_Chatbox_OSC
 ```
 
-### 2. Install Dependencies
+### 2. Install Dependencies, venv, etc
 
 ```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 ### 3. Configure `.env`
@@ -100,7 +123,7 @@ VRCHAT_IP=127.0.0.1
 ## 🖥️ Running the App
 
 ```bash
-python vrchat_status_tray.py
+uv run osc.py
 ```
 
 ### 🔕 Run Silently (No Console Window)
@@ -108,7 +131,7 @@ python vrchat_status_tray.py
 **Option A: Use `.pyw`**
 
 ```bash
-start "" venv\Scripts\pythonw.exe vrchat_status_tray.pyw
+start "" .venv\Scripts\pythonw.exe vrchat_status_tray.pyw
 ```
 
 **Option B: Build a `.exe` with PyInstaller**
