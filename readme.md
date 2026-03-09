@@ -53,40 +53,55 @@ Optional:
 
 ---
 
-# 🛠️ Setup
+## 🛠️ Installation
 
 This project uses **uv** for dependency management instead of `pip`.
 
 **Python 3.14+ is required.**
 
-UV handles:
+`uv` handles:
 
 * virtual environments
 * dependency installation
 * Python version management
 * running the project
 
-Documentation:
-[https://docs.astral.sh/uv/](https://docs.astral.sh/uv/)
-
 ---
 
-## 📦 Setup
+### 1. Download the Project
 
-### 1. Clone the Repository
+1. Option A — Download ZIP (recommended for most users)
 
-```bash
-git clone https://github.com/RaspberryKitty1/VRC_Chatbox_OSC.git
-cd VRC_Chatbox_OSC
+   1. Click **Code → Download ZIP** on the GitHub repository page.
+   2. Extract the ZIP file.
+   3. Open a terminal inside the extracted folder.
+
+2. Option B — Clone with Git
+
+   ```bash
+   git clone https://github.com/RaspberryKitty1/VRC_Chatbox_OSC.git
+   cd VRC_Chatbox_OSC
+   ```
+
+### 2. Install `uv` (Windows)
+
+Open **PowerShell** and run:
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
 ```
 
-### 2. Install Dependencies, venv, etc
+Documentation: <https://docs.astral.sh/uv/>
+
+### 3. Install Dependencies
 
 ```bash
 uv sync
 ```
 
-### 3. Configure `.env`
+---
+
+## ⚙️ Configuration
 
 Create a `.env` file in the project root with:
 
@@ -97,8 +112,12 @@ SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
 VRCHAT_IP=127.0.0.1
 ```
 
-> To get `SPOTIPY_CLIENT_ID` and `SPOTIPY_CLIENT_SECRET`, create a [Spotify Developer App](https://developer.spotify.com/dashboard).
-> Set the Redirect URI in your Spotify app to: `http://127.0.0.1:8888/callback`
+> To get `SPOTIPY_CLIENT_ID` and `SPOTIPY_CLIENT_SECRET`, create an app in the Spotify Developer Dashboard.
+>
+> **Note:** Spotify apps run in Development Mode by default and require a **Spotify Premium account** for API access. (effective March 9, 2026)
+>
+> Set the Redirect URI in your Spotify app to:
+> `http://127.0.0.1:8888/callback`
 
 ---
 
