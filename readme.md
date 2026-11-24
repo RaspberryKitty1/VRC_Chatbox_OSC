@@ -114,6 +114,12 @@ SPOTIPY_CLIENT_SECRET=your-client-secret
 SPOTIPY_REDIRECT_URI=[http://127.0.0.1:8888/callback](http://127.0.0.1:8888/callback)
 ```
 
+To get your `SPOTIPY_CLIENT_ID` and `SPOTIPY_CLIENT_SECRET`, create an app in the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and set the Redirect URI to:
+`http://127.0.0.1:8888/callback`
+
+> [!NOTE]
+> As of March 9, 2026, Spotify apps run in Development Mode by default and require a **Spotify Premium** account for API access.
+
 ## 🎥 YouTube/Twitch & Spotify Integration
 
 * **YouTube/Twitch Media:**
@@ -124,7 +130,7 @@ SPOTIPY_REDIRECT_URI=[http://127.0.0.1:8888/callback](http://127.0.0.1:8888/call
 
      > The userscript sends live info to `ws://localhost:12345`, which this app receives and forwards to VRChat. Updates appear almost instantly in chat.
 
-* **Spotify Playback:**
+* **Spotify Info Pulling:**
 
   * Displays song, artist, and playback progress.
   * Updates every few seconds (default fetch interval is ~15 s), so there may be a slight delay in reflecting current playback or position.
