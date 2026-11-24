@@ -41,14 +41,14 @@ Display your **Spotify now-playing**, **YouTube/Twitch playback info**, and **re
 ## 🧰 Requirements
 
 * Windows
-* UV
+* uv
 * VRChat with OSC enabled
   *(Settings → OSC → Enable OSC & note your local IP)*
 
 Optional:
 
-* Spotify account + Developer App
-* Firefox/Chrome + [Media Info Extractor Extension/User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion)
+* Spotify account + Developer App *(only needed if using Spotify playback)*
+* Browser with a userscript manager + [Media Info Extractor User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion)
 * NVIDIA GPU for GPU stats (`nvidia-ml-py`)
 
 ---
@@ -103,38 +103,31 @@ uv sync
 
 ## ⚙️ Configuration
 
-Create a `.env` file in the project root with:
+Create a `.env` file in the project root (`VRCHAT_IP` is required; `SPOTIPY_*` variables are optional and only needed if you want Spotify playback):
 
 ```dotenv
+VRCHAT_IP=127.0.0.1
+
+# Optional: Only needed for Spotify Media Pulling
 SPOTIPY_CLIENT_ID=your-client-id
 SPOTIPY_CLIENT_SECRET=your-client-secret
-SPOTIPY_REDIRECT_URI=http://127.0.0.1:8888/callback
-VRCHAT_IP=127.0.0.1
+SPOTIPY_REDIRECT_URI=[http://127.0.0.1:8888/callback](http://127.0.0.1:8888/callback)
 ```
-
-> To get `SPOTIPY_CLIENT_ID` and `SPOTIPY_CLIENT_SECRET`, create an app in the Spotify Developer Dashboard.
->
-> **Note:** Spotify apps run in Development Mode by default and require a **Spotify Premium account** for API access. (effective March 9, 2026)
->
-> Set the Redirect URI in your Spotify app to:
-> `http://127.0.0.1:8888/callback`
-
----
 
 ## 🎥 YouTube/Twitch & Spotify Integration
 
 * **YouTube/Twitch Media:**
 
-  1. Install the [Media Info Extractor Extension/User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion) in your browser.
+  1. Install the [Media Info Extractor User Script](https://github.com/RaspberryKitty1/VRC-OSC-Media-Companion) in your browser via a userscript manager.
   2. Play a video on YouTube or Twitch.
   3. Switch your tray icon to `media` **or `full`** mode to see video info in VRChat.
 
-     > The extension sends live info to `ws://localhost:12345`, which this app receives and forwards to VRChat. Updates appear almost instantly in chat.
+     > The userscript sends live info to `ws://localhost:12345`, which this app receives and forwards to VRChat. Updates appear almost instantly in chat.
 
 * **Spotify Playback:**
 
   * Displays song, artist, and playback progress.
-  * Updates every few seconds (default fetch interval is ~15 s), so there may be a slight delay in reflecting current playback or position.
+  * Updates every few seconds (default fetch interval is ~15 s), so there may be a slight delay in reflecting current playback or position.
   * Must be actively playing to show info.
 
 ---
